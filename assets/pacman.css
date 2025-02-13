@@ -1,0 +1,20 @@
+/* Basic reset and styling for the Pac-Man page */
+body {
+  background-color: #000;
+  color: #fff;
+  text-align: center;
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 20px;
+}
+
+h1 {
+  margin-bottom: 10px;
+}
+
+canvas {
+  background-color: #000;
+  display: block;
+  margin: 0 auto 20px auto;
+  border: 2px solid #fff;
+}
