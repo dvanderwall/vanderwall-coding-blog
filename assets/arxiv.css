@@ -16,6 +16,10 @@ h1 {
   color: #333;
 }
 
+.paper-list {
+  margin-top: 20px;
+}
+
 .paper {
   background: #fff;
   padding: 20px;
