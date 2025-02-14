@@ -1,0 +1,66 @@
+/* assets/arxiv.css */
+
+body {
+  font-family: Arial, sans-serif;
+  margin: 20px;
+  background-color: #f9f9f9;
+}
+
+.container {
+  max-width: 900px;
+  margin: auto;
+}
+
+h1 {
+  text-align: center;
+  color: #333;
+}
+
+.paper {
+  background: #fff;
+  padding: 20px;
+  margin: 20px 0;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+.title a {
+  color: #0077cc;
+  text-decoration: none;
+}
+
+.title a:hover {
+  text-decoration: underline;
+}
+
+.authors, .published {
+  color: #555;
+  margin: 5px 0;
+}
+
+.summary {
+  margin-top: 10px;
+  line-height: 1.5;
+}
+
+.update-time {
+  text-align: center;
+  font-size: 0.9em;
+  color: #888;
+  margin-bottom: 20px;
+}
+
+nav {
+  text-align: center;
+  margin-top: 20px;
+}
+
+nav a {
+  color: #0077cc;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+nav a:hover {
+  text-decoration: underline;
+}
