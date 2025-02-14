@@ -13,14 +13,14 @@ canvas.height = rows * cellSize;
 
 /*
   Maze grid legend:
-    0 → empty space (no pellet)
+    0 → empty space (or pellet already eaten)
     1 → wall
-    2 → pellet (dots that Pac-Man can eat)
+    2 → pellet (dot that Pac-Man can eat)
   
-  We create a basic maze:
-  - Outer borders are walls.
-  - Inner cells default to pellets.
-  - Then we add some inner walls for interest.
+  Build a simple maze:
+    - Outer borders are walls.
+    - Inner cells default to pellets.
+    - Then we add some inner walls for interest.
 */
 const maze = [];
 for (let i = 0; i < rows; i++) {
@@ -35,14 +35,14 @@ for (let i = 0; i < rows; i++) {
   }
 }
 
-// Add some inner walls (example pattern)
-// Vertical wall in the center (leaving a gap)
+// Example: Add inner walls
+// Vertical wall in the center (with a gap)
 for (let i = 2; i < rows - 2; i++) {
   if (i !== Math.floor(rows / 2)) {
     maze[i][Math.floor(cols / 2)] = 1;
   }
 }
-// Horizontal wall across the middle (with one opening)
+// Horizontal wall across the middle (with one opening at the center)
 for (let j = 2; j < cols - 2; j++) {
   if (j !== Math.floor(cols / 2)) {
     maze[Math.floor(rows / 2)][j] = 1;
@@ -50,10 +50,27 @@ for (let j = 2; j < cols - 2; j++) {
 }
 
 // ----------------------
+// Fruits Setup
+// ----------------------
+// Define fruit positions in the four corners (inside the walls)
+// Note: The corners of the playable area are (1,1), (cols-2,1), (1,rows-2), (cols-2,rows-2).
+const fruits = [
+  { x: 1, y: 1, collected: false },
+  { x: cols - 2, y: 1, collected: false },
+  { x: 1, y: rows - 2, collected: false },
+  { x: cols - 2, y: rows - 2, collected: false }
+];
+// Remove pellets from fruit cells so they don't overlap
+for (let fruit of fruits) {
+  maze[fruit.y][fruit.x] = 0;
+}
+
+// ----------------------
 // Game Objects & Variables
 // ----------------------
 
-// Pac-Man object: starting at cell (1,1)
+// Pac-Man starting at cell (1,1)
+// (If you wish to delay fruit collection, consider starting Pac-Man at a different cell.)
 let pacman = {
   x: 1,
   y: 1,
@@ -62,23 +79,62 @@ let pacman = {
   speed: 5 // moves every 5 frames
 };
 
-// A single ghost starting in the bottom-right corner
-let ghost = {
-  x: cols - 2,
-  y: rows - 2,
-  dir: { x: 0, y: 0 },
-  speed: 5
+let score = 0;
+let frameCount = 0;
+
+// Define ghost cage settings
+const centerX = Math.floor(cols / 2);
+const centerY = Math.floor(rows / 2) + 1; // Cage center shifted slightly downward
+// Define the cage as a 3x3 region:
+const cage = {
+  left: centerX - 1,
+  right: centerX + 1,
+  top: centerY - 1,
+  bottom: centerY + 1
 };
 
-let score = 0;
-let gameOver = false;
-let frameCount = 0;
+// Ghosts array – create four ghosts with staggered exit delays.
+let ghosts = [];
+function initializeGhosts() {
+  ghosts = [];
+  ghosts.push({
+    x: centerX,
+    y: centerY,
+    dir: { x: 0, y: 0 },
+    speed: 10,       // Slower movement: update every 10 frames
+    inCage: true,
+    exitDelay: 100   // Delay (in frame count) before this ghost starts exiting
+  });
+  ghosts.push({
+    x: centerX - 1,
+    y: centerY,
+    dir: { x: 0, y: 0 },
+    speed: 10,
+    inCage: true,
+    exitDelay: 200
+  });
+  ghosts.push({
+    x: centerX + 1,
+    y: centerY,
+    dir: { x: 0, y: 0 },
+    speed: 10,
+    inCage: true,
+    exitDelay: 300
+  });
+  ghosts.push({
+    x: centerX,
+    y: centerY + 1,
+    dir: { x: 0, y: 0 },
+    speed: 10,
+    inCage: true,
+    exitDelay: 400
+  });
+}
+initializeGhosts();
 
 // ----------------------
 // Input Handling
 // ----------------------
-
-// Listen for arrow key presses to update Pac-Man's next direction
 document.addEventListener("keydown", function(e) {
   switch (e.key) {
     case "ArrowUp":
@@ -109,18 +165,16 @@ function isFree(x, y) {
 // ----------------------
 // Game Update Functions
 // ----------------------
-
-// Update game state (movement, collisions, scoring)
 function update() {
   frameCount++;
 
   // Update Pac-Man's movement every few frames
   if (frameCount % pacman.speed === 0) {
-    // Try to change direction if the next cell in that direction is free
+    // Change direction if possible
     if (isFree(pacman.x + pacman.nextDir.x, pacman.y + pacman.nextDir.y)) {
       pacman.dir = pacman.nextDir;
     }
-    // Move Pac-Man if the cell in the current direction is free
+    // Move if possible
     if (isFree(pacman.x + pacman.dir.x, pacman.y + pacman.dir.y)) {
       pacman.x += pacman.dir.x;
       pacman.y += pacman.dir.y;
@@ -130,44 +184,91 @@ function update() {
       maze[pacman.y][pacman.x] = 0;
       score += 10;
     }
+    // Check for fruit collision
+    for (let fruit of fruits) {
+      if (!fruit.collected && pacman.x === fruit.x && pacman.y === fruit.y) {
+        fruit.collected = true;
+        resetGhostsToCage();
+      }
+    }
   }
 
-  // Update ghost movement every few frames
-  if (frameCount % ghost.speed === 0) {
-    moveGhost(ghost);
-  }
-
-  // Check collision: if Pac-Man meets the ghost, it's game over
-  if (pacman.x === ghost.x && pacman.y === ghost.y) {
-    gameOver = true;
+  // Update ghosts movement (each ghost moves every ghost.speed frames)
+  for (let ghost of ghosts) {
+    if (frameCount % ghost.speed === 0) {
+      if (ghost.inCage && frameCount >= ghost.exitDelay) {
+        // EXIT LOGIC: Force ghost to exit the cage.
+        // First, align ghost horizontally with cage center.
+        if (ghost.x < centerX && isFree(ghost.x + 1, ghost.y)) {
+          ghost.dir = { x: 1, y: 0 };
+        } else if (ghost.x > centerX && isFree(ghost.x - 1, ghost.y)) {
+          ghost.dir = { x: -1, y: 0 };
+        } else {
+          // Once aligned horizontally, move upward to exit.
+          ghost.dir = { x: 0, y: -1 };
+        }
+        if (isFree(ghost.x + ghost.dir.x, ghost.y + ghost.dir.y)) {
+          ghost.x += ghost.dir.x;
+          ghost.y += ghost.dir.y;
+        }
+        // Check if ghost left the cage area
+        if (
+          ghost.x < cage.left ||
+          ghost.x > cage.right ||
+          ghost.y < cage.top ||
+          ghost.y > cage.bottom
+        ) {
+          ghost.inCage = false;
+        }
+      } else if (!ghost.inCage) {
+        // When not in the cage, use random movement.
+        moveGhostRandom(ghost);
+      }
+    }
+    // Collision check: If any ghost touches Pac-Man, restart the game.
+    if (ghost.x === pacman.x && ghost.y === pacman.y) {
+      resetGame();
+      return; // Exit update early after reset.
+    }
   }
 }
 
-// Ghost movement: choose a random valid direction at each move
-function moveGhost(ghost) {
-  // Possible directions (up, down, left, right)
+// Random movement for ghosts (when not in the cage)
+function moveGhostRandom(ghost) {
   const directions = [
     { x: 0, y: -1 },
     { x: 0, y: 1 },
     { x: -1, y: 0 },
     { x: 1, y: 0 }
   ];
-
+  // Filter out invalid moves
   let validDirs = directions.filter(dir =>
     isFree(ghost.x + dir.x, ghost.y + dir.y)
   );
-
-  // If the ghost can continue in its current direction, add it as an option
+  // Optionally keep current direction if still valid
   if (isFree(ghost.x + ghost.dir.x, ghost.y + ghost.dir.y)) {
     validDirs.push(ghost.dir);
   }
-
-  // Choose a random valid direction
   if (validDirs.length > 0) {
     ghost.dir = validDirs[Math.floor(Math.random() * validDirs.length)];
     ghost.x += ghost.dir.x;
     ghost.y += ghost.dir.y;
   }
+}
+
+// Reset game state: reposition Pac-Man and all ghosts; reset score.
+function resetGame() {
+  pacman.x = 1;
+  pacman.y = 1;
+  pacman.dir = { x: 0, y: 0 };
+  pacman.nextDir = { x: 0, y: 0 };
+  initializeGhosts();
+  score = 0;
+}
+
+// Reset ghosts by returning them to the cage (triggered when fruit is collected)
+function resetGhostsToCage() {
+  initializeGhosts();
 }
 
 // ----------------------
@@ -196,16 +297,32 @@ function drawMaze() {
   }
 }
 
+// Draw the fruits in the four corners
+function drawFruits() {
+  for (let fruit of fruits) {
+    if (!fruit.collected) {
+      const x = fruit.x * cellSize + cellSize / 2;
+      const y = fruit.y * cellSize + cellSize / 2;
+      const radius = cellSize / 3;
+      ctx.fillStyle = "orange";
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "yellow";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+}
+
 // Draw Pac-Man with an open mouth (directional)
 function drawPacman() {
-  let centerX = pacman.x * cellSize + cellSize / 2;
-  let centerY = pacman.y * cellSize + cellSize / 2;
+  let centerXPos = pacman.x * cellSize + cellSize / 2;
+  let centerYPos = pacman.y * cellSize + cellSize / 2;
   let radius = cellSize / 2 - 2;
   let mouthAngle = Math.PI / 8;
-
   ctx.fillStyle = "yellow";
   ctx.beginPath();
-
   // Determine starting angle based on current direction
   let startAngle;
   if (pacman.dir.x === -1) { // left
@@ -221,83 +338,69 @@ function drawPacman() {
     startAngle = mouthAngle;
   }
   let endAngle = startAngle + (2 * Math.PI - 2 * mouthAngle);
-  ctx.arc(centerX, centerY, radius, startAngle, endAngle, false);
-  ctx.lineTo(centerX, centerY);
+  ctx.arc(centerXPos, centerYPos, radius, startAngle, endAngle, false);
+  ctx.lineTo(centerXPos, centerYPos);
   ctx.fill();
 }
 
 // Draw a ghost with a simple “spooky” shape
-function drawGhost() {
-  let centerX = ghost.x * cellSize + cellSize / 2;
-  let centerY = ghost.y * cellSize + cellSize / 2;
+function drawGhost(ghost) {
+  let centerXPos = ghost.x * cellSize + cellSize / 2;
+  let centerYPos = ghost.y * cellSize + cellSize / 2;
   let radius = cellSize / 2 - 2;
-
   // Draw ghost body
   ctx.fillStyle = "red";
   ctx.beginPath();
-  ctx.arc(centerX, centerY, radius, Math.PI, 0, false);
-  ctx.lineTo(centerX + radius, centerY + radius);
-  // Create the bottom waves of the ghost
+  ctx.arc(centerXPos, centerYPos, radius, Math.PI, 0, false);
+  ctx.lineTo(centerXPos + radius, centerYPos + radius);
   let waveCount = 4;
   for (let i = 0; i < waveCount; i++) {
     let angle = Math.PI + ((i + 1) * Math.PI) / waveCount;
-    let x = centerX + radius * Math.cos(angle);
-    let y = centerY + radius * Math.sin(angle);
+    let x = centerXPos + radius * Math.cos(angle);
+    let y = centerYPos + radius * Math.sin(angle);
     ctx.lineTo(x, y);
   }
   ctx.closePath();
   ctx.fill();
-
   // Draw ghost eyes
   ctx.fillStyle = "#FFF";
   ctx.beginPath();
-  ctx.arc(centerX - radius / 2.5, centerY - radius / 4, radius / 4, 0, Math.PI * 2);
-  ctx.arc(centerX + radius / 2.5, centerY - radius / 4, radius / 4, 0, Math.PI * 2);
+  ctx.arc(centerXPos - radius / 2.5, centerYPos - radius / 4, radius / 4, 0, Math.PI * 2);
+  ctx.arc(centerXPos + radius / 2.5, centerYPos - radius / 4, radius / 4, 0, Math.PI * 2);
   ctx.fill();
-
   // Draw ghost pupils
   ctx.fillStyle = "#000";
   ctx.beginPath();
-  ctx.arc(centerX - radius / 2.5, centerY - radius / 4, radius / 8, 0, Math.PI * 2);
-  ctx.arc(centerX + radius / 2.5, centerY - radius / 4, radius / 8, 0, Math.PI * 2);
+  ctx.arc(centerXPos - radius / 2.5, centerYPos - radius / 4, radius / 8, 0, Math.PI * 2);
+  ctx.arc(centerXPos + radius / 2.5, centerYPos - radius / 4, radius / 8, 0, Math.PI * 2);
   ctx.fill();
 }
 
-// Draw score and, if applicable, the game over message
+// Draw score and HUD
 function drawHUD() {
   ctx.fillStyle = "#FFF";
   ctx.font = "16px Arial";
   ctx.fillText("Score: " + score, 10, canvas.height - 10);
-  
-  if (gameOver) {
-    ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#FFF";
-    ctx.font = "40px Arial";
-    ctx.fillText("Game Over", canvas.width / 2 - 100, canvas.height / 2);
-  }
 }
 
 // Main draw function
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawMaze();
+  drawFruits();
   drawPacman();
-  drawGhost();
+  for (let ghost of ghosts) {
+    drawGhost(ghost);
+  }
   drawHUD();
 }
 
 // ----------------------
 // Game Loop
 // ----------------------
-
 function gameLoop() {
-  if (!gameOver) {
-    update();
-  }
+  update();
   draw();
   requestAnimationFrame(gameLoop);
 }
-
-// Start the game loop
 gameLoop();
