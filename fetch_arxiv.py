@@ -2,7 +2,7 @@ import feedparser
 import urllib.parse
 from datetime import datetime
 
-def fetch_arxiv_papers(keywords, max_results=10):
+def fetch_arxiv_papers(keywords, max_results=20):
     """
     Fetch the latest arXiv papers that match the given keywords.
     """
@@ -25,21 +25,44 @@ def fetch_arxiv_papers(keywords, max_results=10):
         papers.append(paper)
     return papers
 
+def filter_papers_today(papers):
+    """
+    Return only those papers whose published date is today (UTC).
+    """
+    today_date = datetime.utcnow().date()
+    filtered = []
+    for paper in papers:
+        # arXiv's published field is usually in ISO 8601 format like "2025-02-12T00:00:00Z"
+        try:
+            published_dt = datetime.strptime(paper['published'], "%Y-%m-%dT%H:%M:%SZ").date()
+        except ValueError:
+            try:
+                published_dt = datetime.strptime(paper['published'], "%Y-%m-%d").date()
+            except ValueError:
+                continue
+        if published_dt == today_date:
+            filtered.append(paper)
+    return filtered
+
 def generate_html(papers, keywords):
     """
     Generate an HTML page that lists the arXiv papers.
     """
     update_time = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
     paper_entries = ""
-    for paper in papers:
-        paper_entries += f"""
+    if papers:
+        for paper in papers:
+            paper_entries += f"""
         <div class="paper">
             <h2 class="title"><a href="{paper['pdf_link']}" target="_blank">{paper['title']}</a></h2>
             <p class="authors"><strong>Authors:</strong> {paper['authors']}</p>
             <p class="published"><strong>Published:</strong> {paper['published']}</p>
             <p class="summary">{paper['summary']}</p>
         </div>
-        """
+            """
+    else:
+        paper_entries = "<p>No papers have been published today.</p>"
+    
     html_template = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -51,7 +74,9 @@ def generate_html(papers, keywords):
     <div class="container">
         <h1>Latest arXiv Papers on {keywords}</h1>
         <div class="update-time">Last updated: {update_time}</div>
-        {paper_entries}
+        <div class="paper-list">
+            {paper_entries}
+        </div>
         <nav>
             <p><a href="index.html">Back to Homepage</a></p>
         </nav>
@@ -64,28 +89,9 @@ def generate_html(papers, keywords):
 def main():
     # Define your keywords (using OR to combine multiple topics)
     keywords = 'Computational Structural Biology OR AlphaFold OR "3-Dimensional Motifs" OR kinases'
-    papers = fetch_arxiv_papers(keywords, max_results=10)
-    
-    # Fallback sample papers if the query returns an empty list
-    if not papers:
-        papers = [
-            {
-                "title": "Sample Paper Title 1",
-                "authors": "John Doe, Jane Smith",
-                "summary": "This is a sample abstract for Sample Paper Title 1. It discusses advances in Computational Structural Biology and protein modeling.",
-                "pdf_link": "https://arxiv.org/pdf/1234.56789v1",
-                "published": "2025-02-12"
-            },
-            {
-                "title": "Sample Paper Title 2",
-                "authors": "Alice Johnson, Bob Lee",
-                "summary": "This is a sample abstract for Sample Paper Title 2. It focuses on AlphaFold applications for predicting 3-Dimensional Motifs and kinase regulation.",
-                "pdf_link": "https://arxiv.org/pdf/9876.54321v2",
-                "published": "2025-02-11"
-            }
-        ]
-    
-    html_content = generate_html(papers, keywords)
+    papers = fetch_arxiv_papers(keywords, max_results=20)
+    papers_today = filter_papers_today(papers)
+    html_content = generate_html(papers_today, keywords)
     with open("arxiv.html", "w", encoding="utf-8") as f:
         f.write(html_content)
     print("arxiv.html has been updated.")
