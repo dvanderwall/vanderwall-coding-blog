@@ -22,12 +22,10 @@ jobs:
       - name: Run arXiv update script
         run: python fetch_arxiv.py
 
-      - name: Commit and push changes
-        run: |
-          git config --global user.name "github-actions"
-          git config --global user.email "github-actions@github.com"
-          git add arxiv.html
-          git commit -m "Auto-update arXiv papers"
-          git push
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
+        with:
+          branch: gh-pages  # or the branch you use for GitHub Pages
+          folder: .  # adjust if your artifact folder is different
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
