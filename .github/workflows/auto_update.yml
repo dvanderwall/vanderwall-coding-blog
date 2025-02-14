@@ -25,7 +25,7 @@ jobs:
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
         with:
-          branch: main
-          folder: .  # or the specific folder where your site is built
+          branch: main   # Change this if you're using a different branch (e.g., gh-pages)
+          folder: .      # This deploys the repository root
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
